@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>康威生命游戏 · Conway's Game of Life</title>
+<style>
+  :root{
+    --bg:#070b14;
+    --line:rgba(120,200,255,.14);
+    --mint:#37f2b3;
+    --text:#e8f4ff;
+    --muted:#8ba0b8;
+    --panel:rgba(255,255,255,.045);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;min-height:100%}
+  body{
+    background:
+      radial-gradient(900px 520px at 50% -8%, rgba(20,90,120,.55) 0%, transparent 62%),
+      radial-gradient(700px 480px at 108% 104%, rgba(20,110,90,.32) 0%, transparent 58%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    padding:18px 14px 32px;
+    display:flex;justify-content:center;
+  }
+  .app{width:100%;max-width:900px}
+
+  header{text-align:center;margin-bottom:14px}
+  h1{
+    margin:0;font-size:21px;font-weight:650;letter-spacing:.5px;
+    background:linear-gradient(92deg,#eafff7,#7df3cd 55%,#5ad8ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{margin:6px 0 0;font-size:12px;color:var(--muted);letter-spacing:.6px}
+
+  .stage{
+    position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    background:#070b14;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.02);
+  }
+  canvas{display:block;width:100%;touch-action:none;cursor:crosshair}
+
+  .hud{
+    position:absolute;top:9px;left:9px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none
+  }
+  .pill{
+    font-size:11px;line-height:1;padding:6px 9px;border-radius:999px;
+    background:rgba(7,16,26,.72);border:1px solid rgba(120,200,255,.2);
+    color:#bfe6ff;backdrop-filter:blur(6px);font-variant-numeric:tabular-nums;
+  }
+  .pill b{color:var(--mint);font-weight:600}
+  .pill.live b{color:#9be9ff}
+
+  .tip{
+    margin:9px 2px 0;font-size:12px;color:var(--muted);text-align:center;min-height:16px;
+    transition:color .2s;
+  }
+  .tip.warn{color:#ffb27a}
+
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{
+    font-family:inherit;font-size:13px;border-radius:11px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel);color:var(--text);
+    padding:11px 15px;transition:transform .08s, background .15s, border-color .15s;
+  }
+  button:active{transform:scale(.96)}
+  button:hover{background:rgba(255,255,255,.09)}
+  .btn.main{
+    flex:1 1 150px;min-width:140px;font-weight:650;
+    background:linear-gradient(180deg,#46ffc0,#22c892);color:#04241a;border-color:#5cffcd;
+    box-shadow:0 8px 22px rgba(55,242,179,.26);
+  }
+  .btn.main:hover{background:linear-gradient(180deg,#5cffcd,#2ad79d)}
+  .btn.main.running{
+    background:linear-gradient(180deg,#ffd9a0,#ffb457);border-color:#ffcf8a;
+    color:#3a2200;box-shadow:0 8px 22px rgba(255,180,87,.22);
+  }
+  .btn.ghost{flex:0 0 auto}
+
+  .speed{
+    display:flex;align-items:center;gap:10px;margin-top:12px;
+    padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+  }
+  .speed span{font-size:12px;color:var(--muted);white-space:nowrap}
+  .speed output{font-size:12px;color:var(--mint);min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{
+    flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:99px;
+    background:linear-gradient(90deg,#37f2b3,rgba(120,200,255,.25));outline:none
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:#eafff8;border:3px solid #22c892;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer
+  }
+
+  .presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .chip{
+    font-size:12px;padding:8px 12px;border-radius:999px;
+    background:rgba(55,242,179,.07);border:1px solid rgba(55,242,179,.24);color:#b8ffe6
+  }
+  .chip:hover{background:rgba(55,242,179,.16)}
+
+  details{
+    margin-top:16px;border:1px solid var(--line);border-radius:13px;background:var(--panel);
+    padding:12px 14px;
+  }
+  summary{
+    cursor:pointer;font-size:13px;color:#cde8ff;font-weight:600;list-style:none;
+    display:flex;align-items:center;gap:7px;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .2s}
+  details[open] summary::after{transform:rotate(180deg)}
+  details ol{margin:10px 0 0;padding-left:20px;color:#c6d8ea;font-size:12.5px;line-height:1.85}
+  details ol b{color:var(--mint);font-weight:600}
+  details p{margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>康威生命游戏</h1>
+    <p class="sub">CONWAY'S GAME OF LIFE · 1970 · 零玩家游戏</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="board"></canvas>
+    <div class="hud">
+      <div class="pill">第 <b id="gen">0</b> 代</div>
+      <div class="pill live">细胞 <b id="pop">0</b></div>
+      <div class="pill" id="state">编辑中</div>
+    </div>
+  </div>
+
+  <p class="tip" id="tip">在网格上拖动，画出你想要的初始图案</p>
+
+  <div class="controls">
+    <button class="btn main" id="run">▶ 确认，投入演化</button>
+    <button class="btn ghost" id="stepBtn">单步</button>
+    <button class="btn ghost" id="clear">清空</button>
+    <button class="btn ghost" id="random">随机</button>
+    <button class="btn ghost" id="erase">✏️ 画</button>
+  </div>
+
+  <div class="speed">
+    <span>速度</span>
+    <input type="range" id="speed" min="1" max="30" step="1" value="9">
+    <output id="speedOut">9 代/秒</output>
+  </div>
+
+  <div class="presets" id="presets"></div>
+
+  <details>
+    <summary>四条核心规则（看 8 个相邻格子）</summary>
+    <ol>
+      <li>活细胞，邻居 <b>少于 2</b> 个 → 太孤单，死亡</li>
+      <li>活细胞，邻居 <b>2 或 3</b> 个 → 继续存活</li>
+      <li>活细胞，邻居 <b>多于 3</b> 个 → 太拥挤，死亡</li>
+      <li>死细胞，邻居 <b>刚好 3</b> 个 → 诞生新生命</li>
+    </ol>
+    <p>边界是环绕的：从一边走出去的图案，会从另一边回来。所以滑翔机会一直往前飞。<br>
+    只有四条简单规则，却能演化出消亡、稳定、循环、移动等复杂图案 —— 复杂生命，会不会也是从简单规则里自发长出来的？</p>
+  </details>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var COLS = 48, ROWS = 32, N = COLS * ROWS;
+  var canvas = document.getElementById('board');
+  var ctx = canvas.getContext('2d');
+
+  var cur = new Uint8Array(N);
+  var nxt = new Uint8Array(N);
+  var born = new Uint8Array(N);
+
+  var gen = 0, pop = 0, running = false, speed = 9, eraseMode = false;
+  var cellSize = 12, dpr = 1, lastCell = null;
+  var deadNotice = false;
+
+  var elGen = document.getElementById('gen');
+  var elPop = document.getElementById('pop');
+  var elState = document.getElementById('state');
+  var elTip = document.getElementById('tip');
+  var elRun = document.getElementById('run');
+  var elSpeed = document.getElementById('speed');
+  var elSpeedOut = document.getElementById('speedOut');
+  var elErase = document.getElementById('erase');
+
+  /* ---------- 预设图案 ---------- */
+  var PRESETS = {
+    glider: { label: '滑翔机', rows: [
+      '.O.',
+      '..O',
+      'OOO'
+    ]},
+    pulsar: { label: '脉冲星', rows: [
+      '..OOO...OOO..',
+      '.............',
+      'O....O.O....O',
+      'O....O.O....O',
+      'O....O.O....O',
+      '..OOO...OOO..',
+      '.............',
+      '..OOO...OOO..',
+      'O....O.O....O',
+      'O....O.O....O',
+      'O....O.O....O',
+      '.............',
+      '..OOO...OOO..'
+    ]},
+    gun: { label: '滑翔机枪', rows: [
+      '........................O...........',
+      '......................O.O...........',
+      '............OO......OO............OO',
+      '...........O...O....OO............OO',
+      'OO........O.....O...OO..............',
+      'OO........O...O.O.....O.O...........',
+      '..........O.....O.......O...........',
+      '...........O...O....................',
+      '............OO......................'
+    ]},
+    blinker: { label: '闪光灯', rows: [
+      'OOO'
+    ]},
+    block: { label: '方块', rows: [
+      'OO',
+      'OO'
+    ]},
+    rpent: { label: 'R 五连块', rows: [
+      '.OO',
+      'OO.',
+      '.O.'
+    ]},
+    lwss: { label: '飞船', rows: [
+      '.O..O',
+      'O....',
+      'O...O',
+      'OOOO.'
+    ]}
+  };
+
+  /* ---------- 画布尺寸 ---------- */
+  function resize() {
+    var wrapW = canvas.parentElement.clientWidth;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssCell = wrapW / COLS;
+    var cssH = cssCell * ROWS;
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(wrapW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    cellSize = canvas.width / COLS;
+    draw();
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y);
+    c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r);
+    c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h);
+    c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r);
+    c.quadraticCurveTo(x, y, x + r, y);
+    c.closePath();
+  }
+
+  /* ---------- 绘制 ---------- */
+  function draw() {
+    var W = canvas.width, H = canvas.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // 背景
+    ctx.fillStyle = '#070b14';
+    ctx.fillRect(0, 0, W, H);
+    var g = ctx.createRadialGradient(W / 2, H * 0.1, 0, W / 2, H * 0.1, H * 1.2);
+    g.addColorStop(0, 'rgba(24,110,140,0.20)');
+    g.addColorStop(1, 'rgba(7,11,20,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 网格
+    ctx.strokeStyle = 'rgba(120,200,255,0.075)';
+    ctx.lineWidth = Math.max(1, dpr * 0.6);
+    ctx.beginPath();
+    for (var cx = 1; cx < COLS; cx++) {
+      var gx = Math.round(cx * cellSize) + 0.5;
+      ctx.moveTo(gx, 0); ctx.lineTo(gx, H);
+    }
+    for (var cy = 1; cy < ROWS; cy++) {
+      var gy = Math.round(cy * cellSize) + 0.5;
+      ctx.moveTo(0, gy); ctx.lineTo(W, gy);
+    }
+    ctx.stroke();
+
+    // 细胞
+    var inset = cellSize * 0.11;
+    var side = cellSize - inset * 2;
+    var radius = Math.max(1, cellSize * 0.24);
+    var glow = pop < 900;
+    for (var y = 0; y < ROWS; y++) {
+      for (var x = 0; x < COLS; x++) {
+        var i = y * COLS + x;
+        if (!cur[i]) continue;
+        var px = x * cellSize + inset;
+        var py = y * cellSize + inset;
+        roundRect(ctx, px, py, side, side, radius);
+        if (born[i]) {
+          ctx.fillStyle = '#ddfff4';
+          ctx.shadowColor = 'rgba(200,255,238,0.9)';
+        } else {
+          ctx.fillStyle = '#37f2b3';
+          ctx.shadowColor = 'rgba(55,242,179,0.85)';
+        }
+        if (glow) ctx.shadowBlur = cellSize * 0.9;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  /* ---------- 规则演化 ---------- */
+  function step() {
+    born.fill(0);
+    var i, n;
+    for (var y = 0; y < ROWS; y++) {
+      var ym = y === 0 ? ROWS - 1 : y - 1;
+      var yp = y === ROWS - 1 ? 0 : y + 1;
+      var roofM = ym * COLS, roof = y * COLS, roofP = yp * COLS;
+      for (var x = 0; x < COLS; x++) {
+        var xm = x === 0 ? COLS - 1 : x - 1;
+        var xp = x === COLS - 1 ? 0 : x + 1;
+        n = cur[roofM + xm] + cur[roofM + x] + cur[roofM + xp]
+          + cur[roof + xm] + cur[roof + xp]
+          + cur[roofP + xm] + cur[roofP + x] + cur[roofP + xp];
+        i = roof + x;
+        if (cur[i]) {
+          nxt[i] = (n === 2 || n === 3) ? 1 : 0;
+        } else if (n === 3) {
+          nxt[i] = 1;
+          born[i] = 1;
+        } else {
+          nxt[i] = 0;
+        }
+      }
+    }
+    var tmp = cur; cur = nxt; nxt = tmp;
+    gen++;
+    recount();
+    if (pop === 0 && running) {
+      running = false;
+      deadNotice = true;
+      syncRunButton();
+      setState('已消亡');
+      setTip('所有细胞都消亡了 —— 清空后画个新图案吧', true);
+    } else {
+      syncStats();
+    }
+  }
+
+  function recount() {
+    var s = 0;
+    for (var i = 0; i < N; i++) s += cur[i];
+    pop = s;
+  }
+
+  function syncStats() {
+    elGen.textContent = gen;
+    elPop.textContent = pop;
+    if (!running) setState(pop === 0 ? '空' : '已暂停');
+    else setState('演化中');
+  }
+
+  function setState(t) { elState.textContent = t; }
+
+  function setTip(t, warn) {
+    elTip.textContent = t;
+    elTip.className = warn ? 'tip warn' : 'tip';
+  }
+
+  function syncRunButton() {
+    if (running) {
+      elRun.textContent = '⏸ 暂停';
+      elRun.classList.add('running');
+    } else {
+      elRun.textContent = '▶ 确认，投入演化';
+      elRun.classList.remove('running');
+    }
+  }
+
+  /* ---------- 主循环 ---------- */
+  var lastT = 0, acc = 0;
+  function frame(t) {
+    requestAnimationFrame(frame);
+    if (!lastT) lastT = t;
+    var dt = Math.min(120, t - lastT);
+    lastT = t;
+    if (!running) return;
+    acc += dt;
+    var interval = 1000 / speed;
+    var steps = 0;
+    while (acc >= interval && steps < 8) {
+      acc -= interval;
+      step();
+      steps++;
+      if (!running) break;
+    }
+    if (steps) draw();
+  }
+  requestAnimationFrame(frame);
+
+  /* ---------- 交互：画图 ---------- */
+  function cellAt(ev) {
+    var r = canvas.getBoundingClientRect();
+    var x = Math.floor((ev.clientX - r.left) / r.width * COLS);
+    var y = Math.floor((ev.clientY - r.top) / r.height * ROWS);
+    if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return null;
+    return { x: x, y: y };
+  }
+
+  function setCell(x, y, v) {
+    var i = y * COLS + x;
+    if (cur[i] === v) return false;
+    cur[i] = v;
+    born[i] = 0;
+    return true;
+  }
+
+  function paintLine(a, b) {
+    var changed = false;
+    var v = eraseMode ? 0 : 1;
+    var dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+    var sx = a.x < b.x ? 1 : -1, sy = a.y < b.y ? 1 : -1;
+    var err = dx - dy, x = a.x, y = a.y;
+    for (var guard = 0; guard < 300; guard++) {
+      if (setCell(x, y, v)) changed = true;
+      if (x === b.x && y === b.y) break;
+      var e2 = err * 2;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+    return changed;
+  }
+
+  var dragging = false;
+
+  function onDown(ev) {
+    ev.preventDefault();
+    if (running) {
+      running = false;
+      syncRunButton();
+      setState('已暂停');
+      setTip('演化已暂停，可以继续修改图案');
+    }
+    deadNotice = false;
+    var c = cellAt(ev);
+    if (!c) return;
+    dragging = true;
+    lastCell = c;
+    canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId);
+    var v = eraseMode ? 0 : 1;
+    setCell(c.x, c.y, v);
+    recount();
+    syncStats();
+    draw();
+  }
+
+  function onMove(ev) {
+    if (!dragging) return;
+    ev.preventDefault();
+    var c = cellAt(ev);
+    if (!c) return;
+    if (lastCell) paintLine(lastCell, c);
+    lastCell = c;
+    recount();
+    syncStats();
+    draw();
+  }
+
+  function onUp(ev) {
+    dragging = false;
+    lastCell = null;
+    if (canvas.releasePointerCapture && ev.pointerId != null) {
+      try { canvas.releasePointerCapture(ev.pointerId); } catch (e) {}
+    }
+  }
+
+  canvas.addEventListener('pointerdown', onDown);
+  canvas.addEventListener('pointermove', onMove);
+  canvas.addEventListener('pointerup', onUp);
+  canvas.addEventListener('pointercancel', onUp);
+  canvas.addEventListener('pointerleave', function () { lastCell = null; });
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- 按钮 ---------- */
+  elRun.addEventListener('click', function () {
+    if (running) {
+      running = false;
+      syncRunButton();
+      syncStats();
+      setTip('已暂停。可以修改图案，或继续演化');
+    } else {
+      if (pop === 0) { setTip('先画几个细胞吧 —— 或者点下面的预设图案', true); return; }
+      running = true;
+      deadNotice = false;
+      acc = 0;
+      syncRunButton();
+      syncStats();
+      setTip('演化中：有的会消失，有的会稳定，有的会一直移动');
+    }
+  });
+
+  document.getElementById('stepBtn').addEventListener('click', function () {
+    running = false;
+    syncRunButton();
+    step();
+    draw();
+    setTip('手动前进一代');
+  });
+
+  document.getElementById('clear').addEventListener('click', function () {
+    running = false;
+    cur.fill(0); born.fill(0); gen = 0; pop = 0;
+    syncRunButton();
+    syncStats();
+    draw();
+    setTip('已清空，重新画一个图案吧');
+  });
+
+  document.getElementById('random').addEventListener('click', function () {
+    running = false;
+    cur.fill(0); born.fill(0); gen = 0;
+    for (var i = 0; i < N; i++) cur[i] = Math.random() < 0.26 ? 1 : 0;
+    recount();
+    syncRunButton();
+    syncStats();
+    draw();
+    setTip('随机撒了一把细胞，按「确认」开始演化');
+  });
+
+  elErase.addEventListener('click', function () {
+    eraseMode = !eraseMode;
+    elErase.textContent = eraseMode ? '🩹 擦' : '✏️ 画';
+    elErase.style.borderColor = eraseMode ? 'rgba(255,150,150,.5)' : '';
+    elErase.style.color = eraseMode ? '#ffb3b3' : '';
+    setTip(eraseMode ? '现在是擦除模式：拖动可以擦掉细胞' : '现在是画笔模式：拖动可以画细胞');
+  });
+
+  elSpeed.addEventListener('input', function () {
+    speed = parseInt(elSpeed.value, 10);
+    elSpeedOut.textContent = speed + ' 代/秒';
+  });
+
+  /* ---------- 预设 ---------- */
+  function loadPreset(key) {
+    var p = PRESETS[key];
+    if (!p) return;
+    running = false;
+    cur.fill(0); born.fill(0); gen = 0;
+    var h = p.rows.length, w = 0;
+    for (var i = 0; i < h; i++) w = Math.max(w, p.rows[i].length);
+    var ox = Math.floor((COLS - w) / 2);
+    var oy = Math.floor((ROWS - h) / 2);
+    for (var y = 0; y < h; y++) {
+      var row = p.rows[y];
+      for (var x = 0; x < row.length; x++) {
+        if (row[x] === 'O' || row[x] === 'o' || row[x] === '1') {
+          var gx = ox + x, gy = oy + y;
+          if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) cur[gy * COLS + gx] = 1;
+        }
+      }
+    }
+    recount();
+    syncRunButton();
+    syncStats();
+    draw();
+    setTip('已放入「' + p.label + '」，按「确认」看它怎么变');
+  }
+
+  var presetsEl = document.getElementById('presets');
+  Object.keys(PRESETS).forEach(function (key) {
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.type = 'button';
+    b.textContent = PRESETS[key].label;
+    b.addEventListener('click', function () { loadPreset(key); });
+    presetsEl.appendChild(b);
+  });
+
+  /* ---------- 键盘 ---------- */
+  window.addEventListener('keydown', function (e) {
+    if (e.key === ' ') {
+      e.preventDefault();
+      elRun.click();
+    } else if (e.key === 'r' || e.key === 'R') {
+      document.getElementById('random').click();
+    } else if (e.key === 'c' || e.key === 'C') {
+      document.getElementById('clear').click();
+    }
+  });
+
+  /* ---------- 启动 ---------- */
+  window.addEventListener('resize', resize);
+  resize();
+  syncStats();
+  syncRunButton();
+
+  // 初次进入给个示例：一个滑翔机
+  loadPreset('glider');
+  setTip('拖动可以画细胞 · 按「确认，投入演化」开始');
+})();
+</script>
+</body>
+</html>
